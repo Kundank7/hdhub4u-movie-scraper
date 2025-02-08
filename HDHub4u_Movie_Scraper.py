@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 
-app = Flask(__name__)  # Ensure Gunicorn can find `app`
+app = Flask(__name__)
 
 BASE_URL = "https://hdhub4u.phd"
 
@@ -22,7 +22,7 @@ def get_movie_details():
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # Extract first movie result link
+        # Find first movie result link correctly
         first_movie_link = soup.find('a', href=True)
         if first_movie_link:
             movie_page_url = first_movie_link['href']
@@ -31,20 +31,27 @@ def get_movie_details():
         else:
             return jsonify({'error': 'Movie not found'}), 404
 
-        # Fetch the movie page
+        # Fetch the correct movie page
         response = requests.get(movie_page_url, headers=headers)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # Extract movie details
+        # Extract correct movie details from the correct section
         movie_info_tag = soup.find('span', class_='material-text')
         movie_info = movie_info_tag.get_text(strip=True) if movie_info_tag else "Movie details not available."
 
         # Extract ONLY the 720p x264 download link
-        download_btn = soup.find('a', href=True, text=lambda t: t and "720p x264" in t)
-        download_url = download_btn['href'] if download_btn else "No 720p x264 link found."
+        download_links = soup.find_all('a', href=True)
+        download_url = None
+        for link in download_links:
+            if "720p x264" in link.text:
+                download_url = link["href"]
+                break
 
-        return jsonify({'movie_info': movie_info, 'download_url': download_url})
+        return jsonify({
+            'movie_info': movie_info,
+            'download_url': download_url if download_url else "No 720p x264 link found."
+        })
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
