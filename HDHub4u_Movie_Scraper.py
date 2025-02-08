@@ -4,26 +4,30 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-import shutil
-import os 
+import os
+import subprocess
 
 app = Flask(__name__)
 
-# Function to install Chromium dynamically
 def install_chromium():
-    if not shutil.which("chromium-browser"):
-        os.system("apt update && apt install -y chromium-browser")
-    return "/usr/bin/chromium-browser"
+    """Download and set up a portable Chromium binary."""
+    chrome_path = "/tmp/chrome/chrome"
+    if not os.path.exists(chrome_path):
+        os.makedirs("/tmp/chrome", exist_ok=True)
+        subprocess.run(["wget", "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", "-O", "/tmp/chrome/chrome.deb"])
+        subprocess.run(["dpkg", "-x", "/tmp/chrome/chrome.deb", "/tmp/chrome"])
+        chrome_path = "/tmp/chrome/usr/bin/google-chrome-stable"
+    return chrome_path
 
 def get_movie_details(movie_name):
     search_url = f"https://hdhub4u.phd/search/{movie_name.replace(' ', '%20')}"
 
-    # Install Chromium if not available
+    # Get Chromium binary path
     chrome_path = install_chromium()
 
     # Set up Chrome options
     chrome_options = Options()
-    chrome_options.binary_location = chrome_path  # Use dynamically installed Chrome
+    chrome_options.binary_location = chrome_path  # Use downloaded Chromium
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -31,11 +35,11 @@ def get_movie_details(movie_name):
     # Initialize Selenium WebDriver
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
-    
+
     try:
         driver.get(search_url)
 
-        # Extract movie details (modify class names as needed)
+        # Extract movie details
         try:
             movie_info = driver.find_element(By.CLASS_NAME, "post-info").text
         except:
