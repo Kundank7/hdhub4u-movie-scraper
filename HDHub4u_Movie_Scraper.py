@@ -1,8 +1,5 @@
-# HDHub4u Movie Scraper
-
 from flask import Flask, request, jsonify
 import requests
-import os
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
@@ -16,18 +13,20 @@ def get_movie_details():
     search_url = f'https://hdhub4u.phd/search/{movie_name.replace(" ", "%20")}'
 
     try:
-        response = requests.get(search_url)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+        }
+        response = requests.get(search_url, headers=headers)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        movie_section = soup.find(class_='post-info')
-        download_link = soup.find(class_='download-link')
+        # Extract movie details
+        movie_section = soup.find(class_='post-info')  # Adjust if needed
+        movie_info = movie_section.get_text(strip=True) if movie_section else "Movie details not available."
 
-        if not movie_section or not download_link:
-            return jsonify({'error': 'Movie not found or no download link available'}), 404
-
-        movie_info = movie_section.get_text(strip=True)
-        download_url = download_link.find('a')['href']
+        # Extract download link (new selector)
+        download_btn = soup.find('a', id='lk3b')
+        download_url = download_btn['href'] if download_btn else "No download link found."
 
         return jsonify({'movie_info': movie_info, 'download_url': download_url})
 
@@ -35,5 +34,4 @@ def get_movie_details():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    port = os.environ.get("PORT", "5000")  # Ensure PORT is a string
-    app.run(host='0.0.0.0', port=int(port), debug=True)
+    app.run(host='0.0.0.0', port=5000)
