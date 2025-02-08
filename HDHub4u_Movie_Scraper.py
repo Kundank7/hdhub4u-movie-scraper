@@ -4,14 +4,16 @@ from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
+BASE_URL = "https://hdhub4u.phd"
+
 @app.route('/movie', methods=['GET'])
 def get_movie_details():
     movie_name = request.args.get('name')
     if not movie_name:
         return jsonify({'error': 'Movie name is required'}), 400
 
-    search_url = f'https://hdhub4u.phd/search/{movie_name.replace(" ", "%20")}'
-
+    search_url = f'{BASE_URL}/search/{movie_name.replace(" ", "%20")}'
+    
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
@@ -24,6 +26,8 @@ def get_movie_details():
         first_movie_link = soup.find('a', href=True)
         if first_movie_link:
             movie_page_url = first_movie_link['href']
+            if not movie_page_url.startswith("http"):  # Ensure full URL
+                movie_page_url = BASE_URL + movie_page_url
         else:
             return jsonify({'error': 'Movie not found'}), 404
 
