@@ -25,10 +25,12 @@ def get_movie_details():
         search_response.raise_for_status()
         search_soup = BeautifulSoup(search_response.content, 'html.parser')
 
-        # Find first movie result
+        # Find first movie result and validate URL
         first_result = search_soup.find('a', href=True)
         if first_result:
             movie_page_url = first_result['href']
+            if not movie_page_url.startswith("http"):  # Fix missing "https://"
+                movie_page_url = BASE_URL + movie_page_url
         else:
             return jsonify({'error': 'Movie not found'}), 404
 
