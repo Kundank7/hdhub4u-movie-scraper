@@ -1,72 +1,49 @@
 from flask import Flask, request, jsonify
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-import os
-import subprocess
+import requests
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-def install_chromium():
-    """Download and set up a portable Chromium binary."""
-    chrome_path = "/tmp/chrome/chrome"
-    if not os.path.exists(chrome_path):
-        os.makedirs("/tmp/chrome", exist_ok=True)
-        subprocess.run(["wget", "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", "-O", "/tmp/chrome/chrome.deb"])
-        subprocess.run(["dpkg", "-x", "/tmp/chrome/chrome.deb", "/tmp/chrome"])
-        chrome_path = "/tmp/chrome/usr/bin/google-chrome-stable"
-    return chrome_path
+@app.route('/movie', methods=['GET'])
+def get_movie_details():
+    movie_name = request.args.get('name')
+    if not movie_name:
+        return jsonify({'error': 'Movie name is required'}), 400
 
-def get_movie_details(movie_name):
-    search_url = f"https://hdhub4u.phd/search/{movie_name.replace(' ', '%20')}"
-
-    # Get Chromium binary path
-    chrome_path = install_chromium()
-
-    # Set up Chrome options
-    chrome_options = Options()
-    chrome_options.binary_location = chrome_path  # Use downloaded Chromium
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-
-    # Initialize Selenium WebDriver
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    search_url = f'https://hdhub4u.phd/search/{movie_name.replace(" ", "%20")}'
 
     try:
-        driver.get(search_url)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+        }
+        response = requests.get(search_url, headers=headers)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Extract first movie result link
+        first_movie_link = soup.find('a', href=True)
+        if first_movie_link:
+            movie_page_url = first_movie_link['href']
+        else:
+            return jsonify({'error': 'Movie not found'}), 404
+
+        # Fetch the movie page
+        response = requests.get(movie_page_url, headers=headers)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
 
         # Extract movie details
-        try:
-            movie_info = driver.find_element(By.CLASS_NAME, "post-info").text
-        except:
-            movie_info = "Movie details not available."
+        movie_info_tag = soup.find('span', class_='material-text')
+        movie_info = movie_info_tag.get_text(strip=True) if movie_info_tag else "Movie details not available."
 
-        # Extract download link
-        try:
-            download_btn = driver.find_element(By.ID, "lk3b")
-            download_url = download_btn.get_attribute("href")
-        except:
-            download_url = "No download link found."
+        # Extract first download link
+        download_btn = soup.find('a', href=True, text=lambda t: "720p" in t if t else False)
+        download_url = download_btn['href'] if download_btn else "No download link found."
 
-        driver.quit()
-        return {"movie_info": movie_info, "download_url": download_url}
+        return jsonify({'movie_info': movie_info, 'download_url': download_url})
 
     except Exception as e:
-        driver.quit()
-        return {"error": str(e)}
+        return jsonify({'error': str(e)}), 500
 
-@app.route('/movie', methods=['GET'])
-def movie_api():
-    movie_name = request.args.get("name")
-    if not movie_name:
-        return jsonify({"error": "Movie name is required"}), 400
-
-    movie_details = get_movie_details(movie_name)
-    return jsonify(movie_details)
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
