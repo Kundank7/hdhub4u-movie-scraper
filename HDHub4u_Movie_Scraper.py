@@ -12,7 +12,8 @@ def get_movie_details():
     if not movie_name:
         return jsonify({'error': 'Movie name is required'}), 400
 
-    search_url = f"{BASE_URL}/?s=" + movie_name.replace(" ", "+")
+    # Construct the movie page URL directly
+    movie_page_url = f"{BASE_URL}/{movie_name.lower()}"
 
     try:
         headers = {
@@ -21,27 +22,7 @@ def get_movie_details():
             'Accept-Language': 'en-US,en;q=0.9'
         }
 
-        # 🔍 Step 1: Search for the movie
-        search_response = requests.get(search_url, headers=headers)
-        search_response.raise_for_status()
-        search_soup = BeautifulSoup(search_response.content, 'html.parser')
-
-        # Find the first movie result safely
-        first_result = search_soup.find('h2', class_='post-title')
-        if first_result:
-            movie_link = first_result.find('a', href=True)
-            if movie_link:
-                movie_page_url = movie_link['href']
-            else:
-                return jsonify({'error': 'Movie link not found'}), 404
-        else:
-            return jsonify({'error': 'Movie not found in search results'}), 404
-
-        # Fix missing "https://"
-        if not movie_page_url.startswith("http"):
-            movie_page_url = BASE_URL + movie_page_url
-
-        # 🔍 Step 2: Scrape the actual movie page
+        # 🔍 Step 1: Scrape the movie page
         response = requests.get(movie_page_url, headers=headers)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -54,7 +35,7 @@ def get_movie_details():
         movie_info_tag = soup.find('div', class_='entry-content')
         movie_info = movie_info_tag.get_text(strip=True) if movie_info_tag else "Movie details not available."
 
-        # 🔍 Step 3: Extract all available download links from `bgmiaimassist.in`
+        # 🔍 Step 2: Extract all available download links from `bgmiaimassist.in`
         download_links = {}
         for link in soup.find_all('a', href=True):
             href = link["href"]
@@ -72,7 +53,7 @@ def get_movie_details():
         if not download_links:
             download_links["error"] = "No valid download links found."
 
-        # 🔍 Step 4: Return JSON Response
+        # 🔍 Step 3: Return JSON Response
         response = jsonify({
             'movie_title': movie_title,
             'movie_info': movie_info,
