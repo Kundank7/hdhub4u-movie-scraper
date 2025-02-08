@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 
@@ -25,33 +25,34 @@ def get_movie_details():
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
 
+        # Extract Movie Title
         movie_title_tag = soup.find('h1')
         movie_title = movie_title_tag.get_text(strip=True) if movie_title_tag else "Title not found"
 
+        # Extract Movie Description
         movie_info_tag = soup.find('span', class_='material-text')
         movie_info = movie_info_tag.get_text(strip=True) if movie_info_tag else "Movie details not available."
 
+        # Extract all available download links from `bgmiaimassist.in`
         download_links = {}
         for link in soup.find_all('a', href=True):
             href = link["href"]
             text = link.get_text(strip=True)
 
-            if "720p x264" in text and "download" in href:
+            if "bgmiaimassist.in" in href and "720p x264" in text:
                 download_links["720p x264"] = href
-            elif "480p" in text and "download" in href:
+            elif "bgmiaimassist.in" in href and "480p" in text:
                 download_links["480p"] = href
-            elif "1080p" in text and "download" in href:
+            elif "bgmiaimassist.in" in href and "1080p" in text:
                 download_links["1080p"] = href
 
-        # Add CORS headers manually
+        # Add CORS headers manually for Blogger access
         response = jsonify({
             'movie_title': movie_title,
             'movie_info': movie_info,
             'download_links': download_links
         })
-        response.headers.add("Access-Control-Allow-Origin", "*")  # Allow any site
-        response.headers.add("Access-Control-Allow-Methods", "GET")  # Allow GET requests
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")  # Allow content-type header
+        response.headers.add("Access-Control-Allow-Origin", "*")
         return response
 
     except Exception as e:
