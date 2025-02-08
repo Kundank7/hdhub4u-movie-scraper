@@ -2,6 +2,7 @@
 
 from flask import Flask, request, jsonify
 import requests
+import os
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
@@ -33,5 +34,8 @@ def get_movie_details():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+import os
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))  # Uses PORT from the environment
+    app.run(host='0.0.0.0', port=port)
