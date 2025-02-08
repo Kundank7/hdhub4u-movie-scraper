@@ -12,8 +12,7 @@ def get_movie_details():
     if not movie_name:
         return jsonify({'error': 'Movie name is required'}), 400
 
-    formatted_name = movie_name.lower().replace(" ", "-")
-    movie_url = f"{BASE_URL}/{formatted_name}-2025-hindi-pre-hd-full-movie/"
+    search_url = f"{BASE_URL}/?s=" + movie_name.replace(" ", "+")  # Search for the movie
 
     try:
         headers = {
@@ -21,7 +20,20 @@ def get_movie_details():
             'Referer': BASE_URL,  
             'Accept-Language': 'en-US,en;q=0.9'
         }
-        response = requests.get(movie_url, headers=headers)
+        # Search for the movie
+        search_response = requests.get(search_url, headers=headers)
+        search_response.raise_for_status()
+        search_soup = BeautifulSoup(search_response.content, 'html.parser')
+
+        # Find first movie result
+        first_result = search_soup.find('a', href=True)
+        if first_result:
+            movie_page_url = first_result['href']
+        else:
+            return jsonify({'error': 'Movie not found'}), 404
+
+        # Now scrape the actual movie page
+        response = requests.get(movie_page_url, headers=headers)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
 
