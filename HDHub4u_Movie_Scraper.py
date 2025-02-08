@@ -1,10 +1,8 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS  # Import CORS
+from flask import Flask, request, jsonify, make_response
 import requests
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
 
 BASE_URL = "https://hdhub4u.phd"
 
@@ -45,14 +43,21 @@ def get_movie_details():
             elif "1080p" in text and "download" in href:
                 download_links["1080p"] = href
 
-        return jsonify({
+        # Add CORS headers manually
+        response = jsonify({
             'movie_title': movie_title,
             'movie_info': movie_info,
             'download_links': download_links
         })
+        response.headers.add("Access-Control-Allow-Origin", "*")  # Allow any site
+        response.headers.add("Access-Control-Allow-Methods", "GET")  # Allow GET requests
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")  # Allow content-type header
+        return response
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        response = jsonify({'error': str(e)})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response, 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
