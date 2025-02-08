@@ -1,37 +1,58 @@
 from flask import Flask, request, jsonify
-import requests
-from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+import time
 
 app = Flask(__name__)
 
-@app.route('/movie', methods=['GET'])
-def get_movie_details():
-    movie_name = request.args.get('name')
-    if not movie_name:
-        return jsonify({'error': 'Movie name is required'}), 400
+def get_movie_details(movie_name):
+    search_url = f"https://hdhub4u.phd/search/{movie_name.replace(' ', '%20')}"
 
-    search_url = f'https://hdhub4u.phd/search/{movie_name.replace(" ", "%20")}'
+    # Setup Selenium WebDriver options
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run without opening a browser
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
 
+    # Initialize Selenium WebDriver
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-        }
-        response = requests.get(search_url, headers=headers)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
+        driver.get(search_url)
+        time.sleep(3)  # Wait for JavaScript to load content
 
-        # Extract movie details
-        movie_section = soup.find(class_='post-info')  # Adjust if needed
-        movie_info = movie_section.get_text(strip=True) if movie_section else "Movie details not available."
+        # Extract movie details (modify the class if needed)
+        try:
+            movie_info = driver.find_element(By.CLASS_NAME, "post-info").text
+        except:
+            movie_info = "Movie details not available."
 
-        # Extract download link (new selector)
-        download_btn = soup.find('a', id='lk3b')
-        download_url = download_btn['href'] if download_btn else "No download link found."
+        # Extract download link (modify the ID or class if needed)
+        try:
+            download_btn = driver.find_element(By.ID, "lk3b")
+            download_url = download_btn.get_attribute("href")
+        except:
+            download_url = "No download link found."
 
-        return jsonify({'movie_info': movie_info, 'download_url': download_url})
+        driver.quit()
+        return {"movie_info": movie_info, "download_url": download_url}
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        driver.quit()
+        return {"error": str(e)}
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+@app.route('/movie', methods=['GET'])
+def movie_api():
+    movie_name = request.args.get("name")
+    if not movie_name:
+        return jsonify({"error": "Movie name is required"}), 400
+
+    movie_details = get_movie_details(movie_name)
+    return jsonify(movie_details)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
