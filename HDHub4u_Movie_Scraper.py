@@ -4,16 +4,27 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-import time
+import shutil
+import os
 
 app = Flask(__name__)
+
+# Function to install Chromium dynamically
+def install_chromium():
+    if not shutil.which("chromium-browser"):
+        os.system("apt update && apt install -y chromium-browser")
+    return "/usr/bin/chromium-browser"
 
 def get_movie_details(movie_name):
     search_url = f"https://hdhub4u.phd/search/{movie_name.replace(' ', '%20')}"
 
-    # Setup Selenium WebDriver options
+    # Install Chromium if not available
+    chrome_path = install_chromium()
+
+    # Set up Chrome options
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run without opening a browser
+    chrome_options.binary_location = chrome_path  # Use dynamically installed Chrome
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
 
@@ -23,15 +34,14 @@ def get_movie_details(movie_name):
     
     try:
         driver.get(search_url)
-        time.sleep(3)  # Wait for JavaScript to load content
 
-        # Extract movie details (modify the class if needed)
+        # Extract movie details (modify class names as needed)
         try:
             movie_info = driver.find_element(By.CLASS_NAME, "post-info").text
         except:
             movie_info = "Movie details not available."
 
-        # Extract download link (modify the ID or class if needed)
+        # Extract download link
         try:
             download_btn = driver.find_element(By.ID, "lk3b")
             download_url = download_btn.get_attribute("href")
